@@ -43,7 +43,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-c','--ckpt-path', default = CKPT_PATH, help='The path to the model checkpoints. (Default: /home/michael/ai/models/research/object_detection/training_ssd_80K/export/serving/)', required=False)
-    parser.add_argument('-i','--image-folders', default = iu.IMG_DIRS, help='Image input folders. (Default: /media/michael/Hard Drive/Projects/Project Kronos/sorted_5k_with_synth/pass/, /media/michael/Hard Drive/Projects/Project Kronos/sorted_5k_with_synth/fail/'), required=False)
+    parser.add_argument('-i','--image-folders', default = iu.IMG_DIRS, help='Image input folders. (Default: /media/michael/Hard Drive/Projects/Project Kronos/sorted_5k_with_synth/pass/, /media/michael/Hard Drive/Projects/Project Kronos/sorted_5k_with_synth/fail/', required=False)
     parser.add_argument('-o','--output-folder', default = iu.OUTPUT_DIR, help='Image save folder (Default: /tmp/imgs/output/). NOTE: Will NOT be created automatically.', required=False)
     parser.add_argument('-m','--max-num-images', default = MAX_NUM_IMGS, help='The maximum number of images to process. (Default: 10000)', required=False)
     parser.add_argument('-v','--save-visualizations', default = iu.SAVE_VISUALIZATIONS, help='Whether or not to save visualizations. (Default: False)', required=False)
