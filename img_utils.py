@@ -2,6 +2,7 @@ import numpy as np
 import gc
 import glob
 import cv2
+import matplotlib.pyplot as plt
 from multiprocessing import Pool
 from object_detection.utils import label_map_util
 from object_detection.utils import visualization_utils as vis_util
@@ -9,7 +10,7 @@ from object_detection.utils import visualization_utils as vis_util
 # Define as func for multiprocessing
 def load_img(IMG_PATH, img_dims=(800,600)):
     '''Loads an image and resizes it to the given img_dims
-    
+
     Takes as input an IMG_PATH, and optionally img_dims (default (800,600))
 
     Returns an image scaled to img_dims
@@ -27,7 +28,7 @@ def load_imgs(IMG_DIRS, max_num_imgs=10000, img_dims=(800,600), one_class_name="
 
     Returns a tuple of lists img_paths, img_array, label_array
     '''
-    
+
     # Load the image array with labels
     img_paths = np.array(sum([glob.glob('%s*.jpg' % DIR) for DIR in IMG_DIRS], []))
     max_num_imgs = min(max_num_imgs, len(img_paths))
@@ -54,36 +55,33 @@ def load_imgs(IMG_DIRS, max_num_imgs=10000, img_dims=(800,600), one_class_name="
     del pool
     gc.collect()
     return img_paths, img_array, label_array
-    
+
 def gen_img_segmentation(image, detections, output_name, save_visualizations=False,  label_map='', output_dir='/tmp/imgs/output/', min_score_thresh=0.0):
     """Creates and saves image segmentation for an object detection.
 
     Takes as input:
-    image,
+    image (),
     detections,
     output_name
-    
+
     and optionally: save_visualizations (default False)
     and ouput_dir (default '/tmp/imgs/output/')
     and label_map (default '', required if save_visualizations)
     and min_score_thresh (default 0.0)
-    
+
     WARNING: Will not throw error if output_dir does not exist, and will not create it.
 
     Saves images and (if enabled) visualizations of the detections to the output_dir
 
     Returns nothing.
     """
-    
+
     if save_visualizations and not label_map:
         raise Exception("label_map must be defined if save_visualizations is enabled")
-    image, input_array = input_array
-    #print('last elem of inArray:', input_array[-1])
-    i = input_array[-1]
-    i *= 32
-    enumerated_detections = input_array[0:-1]
-    #print(enumerated_detections)
-    j, detections = enumerated_detections
+
+    if not save_visualizations:
+        del image # Remove unecessary overhead
+
     img_size = (75, 100)
     x = np.zeros([img_size[0],img_size[1], 3])
     for detection in zip(*detections):
@@ -117,19 +115,19 @@ def gen_img_segmentation(image, detections, output_name, save_visualizations=Fal
         plt.imshow(image)
         plt.savefig(output_dir + 'detections_vis_%s' % output_name)
         plt.close()
-        
+
 def gen_img_segmentation_wrapper(input_array, **kwargs):
     '''A wrapper for the gen_img_segmentation
 
     Requires SAVE_VISUALIZATIONS, LABEL_MAP, OUTPUT_DIR, and IMG_PATHS to be defined.
 
-    Takes as input a tuple: (image, ((j, detections), i)) { Why is it formatted that way, you ask? Because pool.map() said so. }
+    Takes as input a tuple: (image, (j, detections, i)) { Why is it formatted that way, you ask? Because pool.map() said so. }
     And any kwargs as options.
 
     Returns nothing.
     '''
-    image, input_array, i = input_array
-    j, detections = input_array
+    image, input_array = input_array
+    j, detections, i = input_array
 
     kwargs["save_visualizations"] = kwargs.get("save_visualizations") or SAVE_VISUALIZATIONS
     kwargs["label_map"] = kwargs.get("label_map") or LABEL_MAP
@@ -137,10 +135,8 @@ def gen_img_segmentation_wrapper(input_array, **kwargs):
     if OUTPUT_DIR:
         kwargs["output_dir"] = kwargs.get("output_dir") or OUTPUT_DIR
 
-    if IMG_PATHS:
-        kwargs["output_name"] = kwargs.get("output_name") or IMG_PATHS[i + j].split('/')[-1]
+    if IMG_PATHS is not None:
+        output_name = IMG_PATHS[(i * 32) + j].split('/')[-1]
     else:
         raise Exception("IMG_PATHS is not defined! Check your IMG_DIRS")
-    gen_img_segmentation(image, detections, i, j, **kwargs)
-
-
+    gen_img_segmentation(image, detections, output_name, **kwargs)
