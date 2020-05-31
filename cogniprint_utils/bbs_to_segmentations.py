@@ -2,14 +2,15 @@
 
 Supports only 3 classes (mapped 1,2,3 -> R,G,B)
 
-Example:
-     $ python bbs_to_segmentations.py \
-         -c /home/michael/ai/models/research/object_detection/training_ssd_80K/export/serving/ \
-         -i /media/michael/Hard Drive/Projects/Project Kronos/sorted_5k_with_synth/pass/, /media/michael/Hard Drive/Projects/Project Kronos/sorted_5k_with_synth/fail/ \
-         -o /tmp/imgs/output/ \
-         -m 10000 \
-         -v False \
-         -l /home/michael/ai/models/research/object_detection/data_kronos/1k_labels.pbtxt
+Example::
+
+         $ python bbs_to_segmentations.py \
+             -c /home/michael/ai/models/research/object_detection/training_ssd_80K/export/serving/ \
+             -i /media/michael/Hard Drive/Projects/Project Kronos/sorted_5k_with_synth/pass/, /media/michael/Hard Drive/Projects/Project Kronos/sorted_5k_with_synth/fail/ \
+             -o /tmp/imgs/output/ \
+             -m 10000 \
+             -v False \
+             -l /home/michael/ai/models/research/object_detection/data_kronos/1k_labels.pbtxt
 
 Copyright © 2020 Michael Paniagua <mrbreadwater@yahoo.com>
 This work is free. You can redistribute it and/or modify it under the
@@ -31,7 +32,7 @@ CKPT_PATH = '/home/michael/ai/models/research/object_detection/training_ssd_80K/
 iu.SAVE_VISUALIZATIONS = False
 iu.LABEL_MAP = '/home/michael/ai/models/research/object_detection/data_kronos/1k_labels.pbtxt'
 iu.IMG_DIRS =  ['/media/michael/Hard Drive/Projects/Project Kronos/sorted_5k_with_synth/pass/', '/media/michael/Hard Drive/Projects/Project Kronos/sorted_5k_with_synth/fail/'] #['/tmp/imgs/pass/', '/tmp/imgs/fail/']
-iu.IMG_PATHS = None
+iu.img_paths = None
 iu.OUTPUT_DIR = None # Use default
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
@@ -54,21 +55,23 @@ if __name__ == "__main__":
     CKPT_PATH = args.ckpt_path
     iu.IMG_DIRS = args.image_folders
     iu.OUTPUT_DIR = args.output_folder
-    MAX_NUM_IMGS = args.max_num_images
+    MAX_NUM_IMGS = int(args.max_num_images)
     iu.SAVE_VISUALIZATIONS = args.save_visualizations
     iu.LABEL_MAP = args.label_map
 
     sess, graph = mu.load_model(model_dir=CKPT_PATH)
     classes, scores, boxes, image_tensor = mu.get_tensors(graph)
-    iu.IMG_PATHS, img_array, _ = iu.load_imgs(iu.IMG_DIRS, max_num_imgs=MAX_NUM_IMGS)
+    iu.img_paths, img_array, _ = iu.load_imgs(iu.IMG_DIRS, max_num_imgs=MAX_NUM_IMGS, balance_classes=0.0)
     gc.collect()
     print("img count:", len(img_array))
 
     pool = Pool(16)
-    for i, imgs in progressbar(enumerate(zip(*[iter(img_array)]*32))): # Translation: for i, imgs in enumerated groups of 32 images
+    imgs_processed = 0
+    for i, imgs in enumerate(zip(*[iter(img_array)]*32)): # Translation: for i, imgs in enumerated groups of 32 images
+        imgs_processed += len(imgs)
         detections = sess.run([classes, boxes, scores], {image_tensor: imgs})
         detections = list(zip(*detections)) # Combine each into individual imgs
-        #detections_list += detections
         input_array = enumerate(detections)
         input_array = zip(imgs, [detection + (i,) for detection in input_array])
         pool.map(iu.gen_img_segmentation_wrapper, input_array)
+        print(imgs_processed)
