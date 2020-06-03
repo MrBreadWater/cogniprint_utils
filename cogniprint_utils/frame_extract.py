@@ -18,14 +18,17 @@ import gc
 import os
 import time
 import cv2
+import glob
 import numpy as np
+from typing import List
+from multiprocessing import Pool
 
 VIDEO_FOLDER = 'timelapses/'
 IMAGE_FOLDER = 'images/'
 DEBUG = False
 
 
-def calc_frames(seconds, multiplier=0.5):
+def calc_frames(seconds: int, multiplier:float = 0.5):
     """Calculates the number of frames which should be extracted from each video.
 
     The equation is as follows: floor(sqrt(m*s))
@@ -50,7 +53,25 @@ def calc_frames(seconds, multiplier=0.5):
     return frame_count_array
 
 
-def gen_frame_count(timelapse_count):
+def gen_frame_count(*args):
+    i, file = args
+
+    if DEBUG:
+        print("\rGenerating values for timelapse #", i + 1, " of ", timelapse_count, end="")
+
+    try:
+        clip = cv2.VideoCapture(file)
+
+        # Calculate frames
+        return int(clip.get(cv2.CAP_PROP_FRAME_COUNT)), int(clip.get(cv2.CAP_PROP_FPS))
+
+    # TODO: Use real error handling. (Seriously what the fuck dude.)
+    except Exception as e:
+        print("Exception gen_frame_counts! Fix, or your results are fucked!")
+        print(e)
+
+
+def gen_frame_counts(files: List[str], pool: Pool):
     """Gets frame counts for each timelapse
 
     Why is it called "gen" frame count? Who the fuck knows.
@@ -64,41 +85,25 @@ def gen_frame_count(timelapse_count):
 
     print("Generating FrameCount array")
     time_start = time.time()
-    video_fps_values = []  # number of frames per second for each video
-    video_frame_nums = []  # number of frames within each video
 
-    # TODO: Replace with actual iteration over a list of paths
-    for i in range(timelapse_count):
-        print("\rGenerating values for timelapse #", i + 1, " of ", timelapse_count, end="")
-        try:
-            # Hacky way to use either mpg or mp4 - 2015 me
-            # Why. Why would you ever. *ever do this.* - 2020 me
-            clip = cv2.VideoCapture(os.path.abspath(VIDEO_FOLDER) + '/' + str(i) + '.mkv')
-            if not clip.read()[0]:  # clip.read()[0] will be true or false depending on success
-                print("Loading from MP4")
-                clip = cv2.VideoCapture(os.path.abspath(VIDEO_FOLDER) + '/' + str(i) + ".mp4")
-
-            # Calculate frames
-            video_frame_nums.append(int(clip.get(cv2.CAP_PROP_FRAME_COUNT)))
-            video_fps_values.append(int(clip.get(cv2.CAP_PROP_FPS)))
-
-        # TODO: Use real error handling. (Seriously what the fuck dude.)
-        except Exception as e:
-            print("Exception gen_frame_count! Fix, or your results are fucked!")
-            print(e)
+    video_info = pool.map(gen_frame_count, enumerate(files))
+    video_frame_nums,  video_fps_values = list(zip(*video_info))
 
     video_times = np.divide(video_frame_nums, video_fps_values)
+
     frames_array = calc_frames(video_times)  # calculate array for # of extracted frames per video
+
     if DEBUG:
         print("video fps vals = ", video_fps_values, "\n video frame nums = ", video_frame_nums)
         print("Video times = ", video_times)
         print("Generated array in %s seconds!" % round(time.time() - time_start, 2))
+
     return frames_array, video_times
 
 
-def gen_times_array(timelapse_count):
+def gen_times_array(timelapse_count: int, pool: Pool):
     '''Gets the frequency in seconds at which extractions should occur
-    
+
     Args:
         timelapse_count (int): Number of timelapses. Also corresponds the timelapse names for some reason.
 
@@ -106,7 +111,7 @@ def gen_times_array(timelapse_count):
         2-tuple of numpy.arrays: Arrays containing the frequency in seconds at which extractions should occur and the length of each video
     '''
 
-    frames_array, video_times = gen_frame_count(timelapse_count)  # get value arrays for videos
+    frames_array, video_times = gen_frame_counts(timelapse_count, pool)  # get value arrays for videos
 
     time_start = time.time()  # Timing it for some reason. Think I wanted to test how fast using numpy made it?
 
@@ -121,61 +126,46 @@ def gen_times_array(timelapse_count):
 
     return interval_array, frames_array
 
+def extract_single_video_frames()
 
-def extract_video_frames(timelapse_count):
+def extract_video_frames(files: List[str], pool: Pool):
     '''Extracts video frames into apropriate folders
 
     Args:
-        timelapse_count (int): Number of timelapses. Also corresponds the timelapse names for some reason.
+        files (int): Number of timelapses. Also corresponds the timelapse names for some reason.
 
     Returns:
         int: number of extracted images
     '''
 
-    interval_array, loop_counts = gen_times_array(timelapse_count)
+    timelapse_count = len(files)
+
+    interval_array, loop_counts = gen_times_array(timelapse_count, pool)
+
     image_num = 0
-    timelapse_path = os.path.abspath(VIDEO_FOLDER) + '/'
-    image_path = (os.path.abspath(IMAGE_FOLDER) + '/')
 
     print(timelapse_count, "timelapses to extract from.")
     print("Extracting images... this will take some time.")
 
-    for i in range(timelapse_count):
+    for i, file, interval, loop_count in enumerate(zip(files, interval_array, loop_counts)):
         print("Extracting images for timelapse #", i, " of ", timelapse_count)
         gc.collect()  # collect and remove unused variables
         vid_time = 0  # reset time for cv2 to grab frame
-        try:
-            # TODO: Fix this mess. Use file path array.
-            for j in range(int(loop_counts[i])):
-                vidcap = cv2.VideoCapture(timelapse_path + str(i) + '.mp4')
-                success = vidcap.read()[0]  # gets if video was succesfully read and image value
-                image_file = image_path + str(image_num) + ".jpg"  # set new image file path and name
-
-                if not success:  # if file not found
-                    vidcap = cv2.VideoCapture(timelapse_path + str(i) + '.mpg')  # change to mpg
-                    success = vidcap.read()[0]  # gets if video was succesfully read and image value
-                if not success:
-                    vidcap = cv2.VideoCapture(timelapse_path + str(i) + '.mkv')  # change to mkv
-                    success = vidcap.read()[0]  # gets if video was succesfully read and image value
-                if success:
-                    vidcap.set(cv2.CAP_PROP_POS_MSEC, vid_time * 1000)
+        vidcap = cv2.VideoCapture(file)
+        success = vidcap.read()[0]  # gets if video was succesfully read and image value
+        if success:
+            for j in range(loop_count):
+                image_file = "%s/%s.jpg" % (image_path, file.split('/')[-1])  # set new image file path and name
+                vidcap.set(cv2.CAP_PROP_POS_MSEC, vid_time * 1000)
+                if DEBUG:
                     print("writing image: " + str(image_num) + '.jpg')
-                    image = vidcap.read()[1]
-                    cv2.imwrite(image_file, image)  # save frame as JPEG file
-                else:
-                    print("NOT SUCCESSFUL: ", )
-                vid_time = vid_time + int(interval_array[i])
-                print("Vid Time = ", vid_time)
-                image_num = image_num + 1
-        # TODO: Error handling again
-        except Exception as e:
-            print(e)
+                image = vidcap.read()[1]
+                cv2.imwrite(image_file, image)  # save frame as JPEG file
+                vid_time += int(interval)
+                image_num += 1
+
     return image_num
 
-
-def foo(x: int, y: str) -> str:
-    print(x,y)
-    return "%s %s" % (y, x)
 
 
 if __name__ == "__main__":
@@ -185,14 +175,22 @@ if __name__ == "__main__":
     parser.add_argument('-v', '--video-folder', default=VIDEO_FOLDER, help='The folder where the videos are saved.',
                         required=True)
     parser.add_argument('-i', '--image-folder', default=IMAGE_FOLDER, help='Image save folder', required=True)
+    parser.add_argument('-d', '--debug', default=DEBUG, help='Verbosity argument, but -v was already taken so.')
     args = parser.parse_args()
 
     VIDEO_FOLDER = args.video_folder
+    DEBUG = args.debug
     IMAGE_FOLDER = args.image_folder
 
-    formats = ['.mp4', '.mpg', '.mkv']
+    timelapse_path = os.path.abspath(VIDEO_FOLDER) + '/'
+    image_path = os.path.abspath(IMAGE_FOLDER)
 
+    files = glob.glob(timelapse_path+"*.mp4")
+    files.extend(glob.glob(timelapse_path+"*.mpg"))
+    files.extend(glob.glob(timelapse_path+"*.mov"))
+    files.extend(glob.glob(timelapse_path+"*.mkv"))
+
+    pool = Pool(16)
     print(os.path.abspath(VIDEO_FOLDER))
 
-    extract_video_frames(
-        len(list(filter(lambda filename: any(ext in filename for ext in formats), os.listdir(VIDEO_FOLDER)))))
+    extract_video_frames(files, pool)
