@@ -147,6 +147,7 @@ def extract_video_frames(files: List[str], pool: Pool):
     print(timelapse_count, "timelapses to extract from.")
     print("Extracting images... this will take some time.")
 
+    # TODO: Implement this with pool mapping
     for i, file, interval, loop_count in enumerate(zip(files, interval_array, loop_counts)):
         print("Extracting images for timelapse #", i, " of ", timelapse_count)
         gc.collect()  # collect and remove unused variables
