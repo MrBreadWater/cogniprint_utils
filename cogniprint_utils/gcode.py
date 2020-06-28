@@ -2,14 +2,33 @@ from pygcode import Line
 from pygcode.exceptions import GCodeWordStrError
 from multiprocessing.pool import ThreadPool
 
-def read_line(line_text):
+def read_line(line_text: str):
+    '''Parse a single line of GCODE using pygcode.Line
+
+    Args:
+        line: A single line of GCODE
+
+    Returns:
+        A Line object, or None
+    '''
     try:
         line = Line(line_text)
         return line
     except GCodeWordStrError:
         print("Warning: Unknown line!")
 
-def get_points_from_line(gcode_line, x, y, z):
+def get_points_from_line(gcode_line: Line, x: float, y: float, z: float):
+    '''Get the XYZ coordinates from a pygcode.Line object
+
+    Args:
+        gcode_line: A pygcode.Line object
+        x: float, current x position
+        y: float, current y position
+        z: float, current y position
+
+    Returns:
+        dict
+    '''
     if not gcode_line:
         return None
 
@@ -27,7 +46,15 @@ def get_points_from_line(gcode_line, x, y, z):
 
     return xyz
 
-def get_points_from_file(file='/home/michael/Downloads/cat.gcode'):
+def get_points_from_file(file : str ='/home/michael/Downloads/cat.gcode'):
+    '''Get all points the printer head moves to from a given GCODE file
+
+    Args:
+        file: the path to the file
+
+    Returns:
+        A numpy.ndarray containing the set of extracted points
+    '''
     with open(file, 'r') as fh:
         lines = fh.readlines()
         import sys
