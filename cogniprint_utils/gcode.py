@@ -1,6 +1,7 @@
 from pygcode import Line
 from pygcode.exceptions import GCodeWordStrError
 from multiprocessing.pool import ThreadPool
+import numpy as np
 
 def read_line(line_text: str):
     '''Parse a single line of GCODE using pygcode.Line
