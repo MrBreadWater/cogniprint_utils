@@ -2,7 +2,6 @@ from pygcode import Line
 from pygcode.exceptions import GCodeWordStrError
 from multiprocessing.pool import ThreadPool
 import numpy as np
-
 def read_line(line_text: str):
     '''Parse a single line of GCODE using pygcode.Line
 
@@ -15,8 +14,8 @@ def read_line(line_text: str):
     try:
         line = Line(line_text)
         return line
-    except GCodeWordStrError:
-        print("Warning: Unknown line!")
+    except GCodeWordStrError, AttributeError:
+        print("Warning: Could not read line!")
 
 def get_points_from_line(gcode_line: Line, x: float, y: float, z: float):
     '''Get the XYZ coordinates from a pygcode.Line object
