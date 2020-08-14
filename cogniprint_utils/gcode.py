@@ -14,7 +14,7 @@ def read_line(line_text: str):
     try:
         line = Line(line_text)
         return line
-    except GCodeWordStrError, AttributeError:
+    except (GCodeWordStrError, AttributeError):
         print("Warning: Could not read line!")
 
 def get_points_from_line(gcode_line: Line, x: float, y: float, z: float):
@@ -40,11 +40,13 @@ def get_points_from_line(gcode_line: Line, x: float, y: float, z: float):
     line_dict = gcodes.get_param_dict()
 
     if not line_dict:
-        return None
+        return
+
+    non_extruding = (not gcode_line.block.modal_params) or not any(map(lambda x: x._value >= 0 and x.letter == "E", gcode_line.block.modal_params))
 
     xyz = [line_dict.get(key, default) for key, default in zip(["X","Y","Z"], [x,y,z])]
 
-    return xyz
+    return xyz, non_extruding
 
 def get_points_from_file(file : str ='/home/michael/Downloads/cat.gcode'):
     '''Get all points the printer head moves to from a given GCODE file
@@ -63,18 +65,20 @@ def get_points_from_file(file : str ='/home/michael/Downloads/cat.gcode'):
         gcode_lines = p.map(read_line, lines)
         #print("completed!")
 
-    x = 0
-    y = 0
-    z = 0.15
+    x = 0.
+    y = 0.
+    z = 0.
 
     points = []
-
+    non_extruding = []
     for gcode_line in gcode_lines:
-        xyz = get_points_from_line(gcode_line, x, y, z)
-        if xyz:
+        xyze = get_points_from_line(gcode_line, x, y, z)
+        if xyze:
+            xyz, no_extrude = xyze
             points.append(xyz)
-            x, y, z = xyz
-
-    points = np.array(points)
+            non_extruding.append(no_extrude)
+            x,y,z = xyz
+        #print(xyz)
+    points = np.array(points), np.array(non_extruding)
 
     return points
